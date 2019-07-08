@@ -40,7 +40,8 @@ endif()
 add_library(hclib SHARED ${SOURCES})
 
 target_compile_features(hclib PUBLIC c_std_11)
-target_compile_features(hclib PUBLIC cxx_std_11)
+target_compile_features(hclib PUBLIC cxx_std_14)
+set_target_properties(hclib PROPERTIES CXX_EXTENSIONS off)
 
 #set(CMAKE_BUILD_TYPE "Release")
 #set(CMAKE_BUILD_TYPE "Debug")
