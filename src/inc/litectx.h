@@ -79,6 +79,10 @@ static inline void *LITECTX_ALLOC(size_t nbytes) {
 #endif
 
 static __inline__ LiteCtx *LiteCtx_create(void (*fn)(LiteCtx*)) {
+
+   //Next two lines (size declaration and pragma) are for SST Macro simulator compatibility.
+    static const int size = LITECTX_SIZE;
+#pragma sst stack alloc(size, sizeof(LiteCtx))
     LiteCtx *ctx = (LiteCtx *)LITECTX_ALLOC(LITECTX_SIZE);
     if (!ctx) {
         fprintf(stderr, "Failed allocating litectx\n");
