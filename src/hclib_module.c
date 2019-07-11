@@ -66,7 +66,6 @@ int hclib_add_module_init_function(const char *name,
     } else {
         assert(!simple_list_contains(post, post_init_functions));
         assert(!simple_list_contains(finalize, finalize_functions));
-
         simple_list_append(pre, pre_init_functions);
         simple_list_append(post, post_init_functions);
         simple_list_append(finalize, finalize_functions);

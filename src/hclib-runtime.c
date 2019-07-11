@@ -230,10 +230,10 @@ hclib_worker_state *current_ws() {
 // FWD declaration for pthread_create
 static void *worker_routine(void *args);
 
+static hclib_locale_t *central_place = NULL;
 hclib_locale_t *default_dist_func(const int dim,
         const hclib_loop_domain_t *subloops, const hclib_loop_domain_t *loops,
         const int mode) {
-    static hclib_locale_t *central_place = NULL;
     if (!central_place) {
         central_place = hclib_get_central_place();
     }

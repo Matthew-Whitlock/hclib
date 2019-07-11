@@ -131,8 +131,8 @@ static void strreverse(char* begin, char* end) {
 /*
  * Pulled from http://www.strudel.org.uk/itoa/
  */
+static char num[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 static void itoa(int value, char* str, int base) {
-    static char num[] = "0123456789abcdefghijklmnopqrstuvwxyz";
     char* wstr=str;
     int sign;
 
@@ -1053,10 +1053,9 @@ static int keep_duplicates(hclib_locale_t **l, hclib_locale_t **path,
 /*
  * Fetch a locale that is on all threads' pop and steal paths.
  */
+static int central_initialized = 0;
+static hclib_locale_t *central = NULL;
 hclib_locale_t *hclib_get_central_place() {
-    static int central_initialized = 0;
-    static hclib_locale_t *central = NULL;
-
     if (central_initialized == 0) {
         hclib_worker_paths *paths = hc_context->worker_paths + 0;
         hclib_locality_path *steal = paths->steal_path;

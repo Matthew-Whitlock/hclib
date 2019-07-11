@@ -20,6 +20,6 @@
 /** @brief No accumulator argument provided. */
 #define NO_ACCUM NULL
 
-// #define VERBOSE 1
+//#define VERBOSE 0
 
 #endif

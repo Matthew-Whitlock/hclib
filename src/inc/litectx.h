@@ -79,7 +79,6 @@ static inline void *LITECTX_ALLOC(size_t nbytes) {
 #endif
 
 static __inline__ LiteCtx *LiteCtx_create(void (*fn)(LiteCtx*)) {
-
    //Next two lines (size declaration and pragma) are for SST Macro simulator compatibility.
     static const int size = LITECTX_SIZE;
 #pragma sst stack alloc(size, sizeof(LiteCtx))
@@ -116,6 +115,7 @@ static __inline__ void LiteCtx_destroy(LiteCtx *ctx) {
         exit(1);
     }
 #endif
+#pragma sst stack free(ctx)
     LITECTX_FREE(ctx);
 }
 
