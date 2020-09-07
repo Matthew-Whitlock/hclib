@@ -60,6 +60,15 @@ void hclib_promise_init(hclib_promise_t *promise) {
     promise->datum = UNINITIALIZED_PROMISE_DATA_PTR;
     promise->wait_list_head = SENTINEL_FUTURE_WAITLIST_PTR;
     promise->future.owner = promise;
+    promise->percept_type = 0; //Since no percept_type is provided, default to 0
+}
+
+/**
+ * Initialize a pre-Allocated promise, but also provide a percept_type
+ */
+void hclib_promise_init_percept(hclib_promise_t *promise, int _percept_type){
+    hclib_promise_init(promise);
+    promise->percept_type = _percept_type;
 }
 
 /**
@@ -170,12 +179,28 @@ static inline int _register_if_promise_not_ready(
  */
 int register_on_all_promise_dependencies(hclib_task_t *wrapper_task) {
     while (wrapper_task->waiting_on_index < MAX_NUM_WAITS - 1) {
+        //The previous future is done being waited on, so lets update the percept info of it
+        //waiting_on is initialized to -1, which would be a problem to index to
+        if(wrapper_task->waiting_on_index != -1){
+            hclib_future_t *prev = wrapper_task->waiting_on[wrapper_task->waiting_on_index];
+            if(prev != NULL){
+                //percept info is 5-bit task-type, 5-bit promise-type, 5-bit workerID
+                int percept_info = (((int)wrapper_task->_fp & 0x1F)<<10) | 
+                    ((prev->owner->percept_type & 0x1F)<<5) | (prev->owner->satisfied_by & 0x1F);
+            
+                wrapper_task->percept_info[wrapper_task->waiting_on_index] = percept_info;
+            }
+        }
+
         wrapper_task->waiting_on_index++;
         hclib_future_t *curr = wrapper_task->waiting_on[wrapper_task->waiting_on_index];
         if (curr) {
             if (_register_if_promise_not_ready(wrapper_task, curr)) {
                 return 0;
             }
+        } else {
+            //current is null, so all values after it must be as well.
+            break;
         }
     }
 
@@ -198,6 +223,7 @@ void hclib_promise_put(hclib_promise_t *promise_to_be_put,
         promise_to_be_put->wait_list_head;
 
     promise_to_be_put->datum = datum_to_be_put;
+    promise_to_be_put->satisfied_by = CURRENT_WS_INTERNAL->id;
     promise_to_be_put->satisfied = 1;
 
     /*

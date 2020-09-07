@@ -77,8 +77,10 @@ struct hclib_task_t;
 // We define a typedef in this unit for convenience
 typedef struct hclib_promise_st {
     int type;
+    int percept_type; //"type" of promise for perceptron learning purposes
     hclib_future_t future;
     volatile int satisfied;
+    volatile int satisfied_by;
     void *volatile datum;
     /*
      * List of tasks that are awaiting the satisfaction of this promise.
@@ -102,6 +104,11 @@ hclib_promise_t *hclib_promise_create();
  * Initialize a pre-Allocated promise.
  */
 void hclib_promise_init(hclib_promise_t *promise);
+
+/**
+ * Initialize a pre-Allocated promise and provide a percept_type for scheduling inference
+ */
+void hclib_promise_init_percept(hclib_promise_t *promise, int _percept_type);
 
 /**
  * Fetch the future associated with the provided promise. Tasks can then express

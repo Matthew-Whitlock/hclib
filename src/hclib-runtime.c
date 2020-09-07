@@ -49,6 +49,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <dlfcn.h>
 #include <stddef.h>
 
+//Used for checking cache misses for perceptron learning
+#define USE_PAPI
+#ifdef USE_PAPI
+#include "papi.h"
+#endif
+
 #include <hclib.h>
 #include <hclib-internal.h>
 #include <hclib-atomics.h>
@@ -56,6 +62,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <hclib-locality-graph.h>
 #include <hclib-module.h>
 #include <hclib-instrument.h>
+#include <hclib-percept.h>
 
 #ifdef USE_HWLOC
 #include <hwloc.h>
@@ -377,6 +384,18 @@ static void hclib_entrypoint(const char **module_dependencies,
     }
 #endif
 
+
+#ifdef USE_PAPI
+    //to measure performance of tasks for updating perceptron, we need to start PAPI
+    //must be done on each thread, including this non-worker thread (?)
+    int perr;
+    int events[1] = {PAPI_L1_DCM};
+    if((perr = PAPI_start_counters(events, 1)) != PAPI_OK){
+        fprintf(stderr, "PAPI not OK at start w/ code %d. Exiting.\n", perr);
+        exit(1);
+    }
+#endif
+    
     // Launch the worker threads
     pthread_attr_t attr;
     if (pthread_attr_init(&attr) != 0) {
@@ -401,6 +420,9 @@ static void hclib_entrypoint(const char **module_dependencies,
 
     const unsigned dist_id = hclib_register_dist_func(default_dist_func);
     HASSERT(dist_id == HCLIB_DEFAULT_LOOP_DIST);
+
+    hc_context->perceptron = (hclib_internal_perceptron_t*)malloc(sizeof(hclib_internal_perceptron_t));
+    perceptron_init(hc_context->perceptron);
 
     // allocate root finish
     hclib_start_finish();
@@ -427,6 +449,15 @@ void hclib_join(int nb_workers) {
 }
 
 void hclib_cleanup() {
+
+#ifdef USE_PAPI
+for(int i = 0; i < (1<<PERCEPT_INDEX_BITS); i++){
+    if(hc_context->perceptron->array[i] != 0){
+        fprintf(stderr, "Found %d at 0x%04x\n", hc_context->perceptron->array[i], i);
+    }
+}
+#endif
+
     pthread_key_delete(ws_key);
 
     hclib_call_finalize_functions();
@@ -472,8 +503,34 @@ static inline void execute_task(hclib_task_t *task) {
     worker_stats[ws->id].executed_tasks++;
 #endif
 
+
+    long long l1_cache_misses[1];
+#ifdef USE_PAPI
+    int perr;
+    //Read at the beginning of the task to reset counters, so we capture just the task.
+    if((perr = PAPI_read_counters(l1_cache_misses, 1)) != PAPI_OK){
+        fprintf(stderr, "PAPI not OK at start w/ code %d. Exiting.\n", perr);
+        exit(1);
+    }
+#endif
+
     // task->_fp is of type 'void (*generic_frame_ptr)(void*)'
     (task->_fp)(task->args);
+    
+#ifdef USE_PAPI
+    //Now l1_cache_misses has just the misses during the task.
+    if((perr = PAPI_read_counters(l1_cache_misses, 1)) != PAPI_OK){
+        fprintf(stderr, "PAPI not OK at start w/ code %d. Exiting.\n", perr);
+        exit(1);
+    }
+#else
+    l1_cache_misses[0] = 0;
+#endif
+    fprintf(stderr, "Worker %d updating task w/ %lld misses\n", ws->id, *l1_cache_misses);
+    //l1_cache_misses[0] = 0;
+    //update perceptron based on the performance of this task.
+    perceptron_update(hc_context->perceptron, task, *l1_cache_misses);
+
     check_out_finish(current_finish);
     free(task);
 }
@@ -905,6 +962,17 @@ static void *worker_routine(void *args) {
     set_current_worker(wid);
     hclib_worker_state *ws = CURRENT_WS_INTERNAL;
 
+    //to measure performance of tasks for updating perceptron, we need to start PAPI
+    //must be done on each thread.
+#ifdef USE_PAPI
+    int perr;
+    int events[1] = {PAPI_L1_DCM};
+    if((perr = PAPI_start_counters(events, 1)) != PAPI_OK){
+        fprintf(stderr, "PAPI not OK at start w/ code %d. Exiting.\n", perr);
+        exit(1);
+    }
+#endif
+    
     set_up_worker_thread_affinities(wid);
 
     // Create proxy original context to switch from

@@ -46,6 +46,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hclib.h"
 #include "litectx.h"
 #include "hclib-locality-graph.h"
+#include "hclib-percept.h"
 
 #define LOG_LEVEL_FATAL         1
 #define LOG_LEVEL_WARN          2
@@ -102,6 +103,7 @@ typedef struct hclib_context {
     hclib_memory_tree_node *pinned_host_allocs;
     cudaStream_t stream;
 #endif
+    hclib_internal_perceptron_t *perceptron; //perceptron for learning next best task
 } hclib_context;
 
 #include "hclib-finish.h"

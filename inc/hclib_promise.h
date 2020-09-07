@@ -48,7 +48,7 @@ struct promise_t: public hclib_promise_t {
             "promise_t arg type can't be recast to void*.");
 #endif  // HAVE_CXX11_TRIVIAL_COPY_CHECK
 
-    promise_t() { hclib_promise_init(this); }
+    promise_t(int percept_type = __builtin_LINE()) { hclib_promise_init_percept(this, percept_type); }
 
     void put(T datum) {
         void *tmp;
@@ -71,7 +71,7 @@ struct promise_t: public hclib_promise_t {
 // Specialized for pointers
 template<typename T>
 struct promise_t<T*>: public hclib_promise_t {
-    promise_t() { hclib_promise_init(this); }
+    promise_t(int percept_type = __builtin_LINE()) { hclib_promise_init_percept(this, percept_type); }
 
     void put(T *datum) {
         hclib_promise_put(this, datum);
@@ -88,7 +88,7 @@ struct promise_t<T*>: public hclib_promise_t {
 // Specialized for references
 template<typename T>
 struct promise_t<T&>: public hclib_promise_t {
-    promise_t() { hclib_promise_init(this); }
+    promise_t(int percept_type = __builtin_LINE()) { hclib_promise_init_percept(this, percept_type); }
 
     void put(T &datum) {
         hclib_promise_put(this, &datum);
@@ -105,7 +105,7 @@ struct promise_t<T&>: public hclib_promise_t {
 // Specialized for void
 template<>
 struct promise_t<void>: public hclib_promise_t {
-    promise_t() { hclib_promise_init(this); }
+    promise_t(int percept_type = __builtin_LINE()) { hclib_promise_init_percept(this, percept_type); }
 
     void put() {
         hclib_promise_put(this, nullptr);

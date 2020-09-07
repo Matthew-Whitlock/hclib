@@ -24,10 +24,12 @@
  *      entry.
  *   5) waiting_on_index: The future in waiting_on that we are currently waiting
  *      for.
- *   5) locale: The locale at which this task should execute.
- *   6) non_blocking: Whether this task will block on other operations (i.e.
+ *   6) percept_info: The perceptron information for each future, which is used
+ *      to learn how likely this task is to be best-to-execute.
+ *   7) locale: The locale at which this task should execute.
+ *   8) non_blocking: Whether this task will block on other operations (i.e.
  *      call hclib_end_finish, hclib_future_wait, etc).
- *   7) next_waiter: Used to track tasks blocked on the same future.
+ *   9) next_waiter: Used to track tasks blocked on the same future.
  */
 typedef struct hclib_task_t {
     generic_frame_ptr _fp;
@@ -35,6 +37,7 @@ typedef struct hclib_task_t {
     struct finish_t *current_finish;
     hclib_future_t *waiting_on[MAX_NUM_WAITS + 1];
     int waiting_on_index;
+    unsigned percept_info[MAX_NUM_WAITS + 1];
     hclib_locale_t *locale;
     int non_blocking;
     struct hclib_task_t *next_waiter;

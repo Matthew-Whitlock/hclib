@@ -68,6 +68,9 @@ typedef struct hclib_internal_deque_t {
     volatile int tail;
 
     volatile hclib_task_t* data[INIT_DEQUE_CAPACITY];
+    
+    //just for software emulation of perceptron stuff, we want to synchronize access to this
+    volatile int owned;
 } hclib_internal_deque_t;
 
 void deque_init(hclib_internal_deque_t *deq, void *initValue);

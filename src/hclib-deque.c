@@ -39,18 +39,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hclib-internal.h"
 #include "hclib-atomics.h"
 
+//Only needed for inefficient perceptron testing
+extern hclib_context *hc_context;
+
 void deque_init(hclib_internal_deque_t *deq, void *init_value) {
     deq->head = 0;
     deq->tail = 0;
+    deq->owned = 0;
 }
 
 /*
  * push an entry onto the tail of the deque
  */
 int deque_push(hclib_internal_deque_t *deq, void *entry) {
+    //try to get ownership until successful before doing this stuff
+    //Old value is returned - if old value was 0, we are done.
+    while(hc_cas(&deq->owned, 0, 1));
+    
     int size = deq->tail - deq->head;
     if (size == INIT_DEQUE_CAPACITY) { /* deque looks full */
         /* may not grow the deque if some interleaving steal occur */
+        //be sure to relinquish ownership before returning!
+        deq->owned = 0;
         return 0;
     }
     const int n = (deq->tail) % INIT_DEQUE_CAPACITY;
@@ -60,6 +70,10 @@ int deque_push(hclib_internal_deque_t *deq, void *entry) {
     hc_mfence();
 
     deq->tail++;
+    
+    //release ownership
+    deq->owned = 0;
+
     return 1;
 }
 
@@ -81,7 +95,11 @@ int deque_steal(hclib_internal_deque_t *deq, void **stolen) {
      */
 
     int nstolen = 0;
-
+    
+    //Try to get ownership until successful before doing stuff
+    //Old value is returned - if old value was 0, we are done.
+    while(hc_cas(&deq->owned, 0, 1));
+    
     int success;
     do {
         const int head = deq->head;
@@ -102,6 +120,9 @@ int deque_steal(hclib_internal_deque_t *deq, void **stolen) {
         }
     } while (success && nstolen < STEAL_CHUNK_SIZE);
 
+    //release ownership
+    deq->owned = 0;
+
     return nstolen;
 }
 
@@ -109,32 +130,55 @@ int deque_steal(hclib_internal_deque_t *deq, void **stolen) {
  * pop the task out of the deque from the tail
  */
 hclib_task_t *deque_pop(hclib_internal_deque_t *deq) {
+    hclib_task_t *t = NULL;
+
+    //try to get ownership until successful before doing this stuff
+    //Old value is returned - if old value was 0, we are done.
+    while(hc_cas(&deq->owned, 0, 1));
+    
     hc_mfence();
     int tail = deq->tail;
     tail--;
     deq->tail = tail;
     hc_mfence();
     int head = deq->head;
-
+    
     int size = tail - head;
     if (size < 0) {
         deq->tail = deq->head;
+        deq->owned = 0;
         return NULL;
     }
-    hclib_task_t *t = (hclib_task_t *) deq->data[tail % INIT_DEQUE_CAPACITY];
 
-    if (size > 0) {
-        return t;
+    hclib_internal_perceptron_t *perceptron = hc_context->perceptron;
+    int best_task = tail;
+    int best_score = perceptron_check(perceptron, (hclib_task_t*) deq->data[tail % INIT_DEQUE_CAPACITY]);
+    for(int task = tail-1; task >= head; task--){
+        int task_score = perceptron_check(perceptron, (hclib_task_t*) deq->data[task%INIT_DEQUE_CAPACITY]);
+        if(task_score > best_score){
+            best_task = task;
+            best_score = task_score;
+        }
     }
+    
+    t = (hclib_task_t *) deq->data[best_task % INIT_DEQUE_CAPACITY];
 
-    /* now size == 1, I need to compete with the thieves */
-    const int old = hc_cas(&deq->head, head, head + 1);
-    if (old != head) {
-        t = NULL;
+    
+    if(best_task != tail){
+        //We've taken from the middle, which is a terrible idea for a deque
+        //(it'll be fine when implemented in HW)
+        //we need to shift the values over to be back within head to tail
+        //This is already terribly inefficient, so I'm not so worried about 
+        //  optimizing
+        for(int task = best_task; task < tail; task++){
+            deq->data[task%INIT_DEQUE_CAPACITY] = 
+                deq->data[(task+1)%INIT_DEQUE_CAPACITY]; 
+        }
     }
-
-    /* now the deque is empty */
-    deq->tail = deq->head;
+    
+    //release ownership now that I'm done
+    deq->owned = 0;
+    
     return t;
 }
 

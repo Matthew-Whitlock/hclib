@@ -14,6 +14,7 @@ set(SOURCES
   hclib-mem.c 
   hclib-instrument.c 
   hclib_atomic.c
+  hclib-percept.c
   jsmn/jsmn.c
 )
 
@@ -81,6 +82,8 @@ target_include_directories(hclib ${HWLOC_HOME}/include)
 target_link_directories(hclib PUBLIC ${HWLOC_HOME}/lib)
 target_link_libraries(hclib PUBLIC hwloc)
 endif(HCLIB_ENABLE_HWLOC)
+
+target_link_libraries(hclib PUBLIC /usr/lib/x86_64-linux-gnu/libpapi.so.5)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_link_libraries(hclib PUBLIC pthread)
